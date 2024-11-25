@@ -1,0 +1,11 @@
+/Lib
+Lib/
+Lib
+/Scripts
+Scripts/
+Scripts
+pyvenv.cfg
+.idea
+
+venv
+__pycache__
