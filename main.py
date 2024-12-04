@@ -1,18 +1,39 @@
-from typing import Union
+from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import uvicorn
+from fastapi import FastAPI, HTTPException
 from jaqpot_api_client.models.prediction_request import PredictionRequest
 from jaqpot_api_client.models.prediction_response import PredictionResponse
 
-from src.my_model_handler import model_infer
+from src.loggers.logger import logger
+from src.loggers.log_middleware import LogMiddleware
+from src.model import ModelService
 
-app = FastAPI()
+model_service: ModelService = None
 
-@app.get("/")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the ML model
+    global model_service
+    model_service = ModelService()
+    yield
+
+app = FastAPI(title="ML Model API", lifespan=lifespan)
+app.add_middleware(LogMiddleware)
+
+@app.post("/infer", response_model=PredictionResponse)
+def infer(req: PredictionRequest) -> PredictionResponse:
+    try:
+        return model_service.predict(req)
+    except Exception as e:
+        logger.error("Prediction request for model failed " + str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
 def health_check():
-    return {"status": "UP"}
+    return {"status": "OK"}
 
-@app.post("/infer")
-def predict(req: PredictionRequest) -> PredictionResponse:
-    return model_infer(req)
 
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8002, log_config=None)
