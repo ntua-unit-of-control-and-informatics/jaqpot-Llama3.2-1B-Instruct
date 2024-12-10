@@ -9,3 +9,8 @@ pyvenv.cfg
 
 venv
 __pycache__
+
+llama
+
+model.pkl
+tokenizer.pkl

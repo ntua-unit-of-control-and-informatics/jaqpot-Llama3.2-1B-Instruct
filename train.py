@@ -1,16 +1,14 @@
-import pandas as pd
-from sklearn.datasets import make_classification
-from sklearn.ensemble import RandomForestClassifier
 import joblib
+import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-# Generate sample data
-X, y = make_classification(n_samples=1000, n_features=4, n_informative=2, n_redundant=0)
+model_path = "./llama"
 
-df = pd.DataFrame(X, columns=["X1", "X2", "X3", "X4"])
+tokenizer = AutoTokenizer.from_pretrained(model_path)
+model = AutoModelForCausalLM.from_pretrained(model_path)
 
-# Train a sample model
-model = RandomForestClassifier(n_estimators=100)
-model.fit(df, y)
+model.to("cpu")
 
 # Save the model
 joblib.dump(model, 'model.pkl')
+joblib.dump(tokenizer, 'tokenizer.pkl')

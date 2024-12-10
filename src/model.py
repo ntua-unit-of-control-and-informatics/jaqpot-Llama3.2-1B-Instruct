@@ -9,17 +9,11 @@ from jaqpot_api_client.models.prediction_response import PredictionResponse
 class ModelService:
     def __init__(self):
         self.model = joblib.load('model.pkl')
+        self.tokenizer = joblib.load('tokenizer.pkl')
 
     def predict(self, request: PredictionRequest) -> PredictionResponse:
         # Convert input list to DataFrame
         input_data = pd.DataFrame(request.dataset.input)
-
-        # Get feature columns (excluding jaqpotRowId)
-        feature_cols = [col for col in input_data.columns if col != 'jaqpotRowId']
-
-        # Make predictions for all rows at once
-        predictions = self.model.predict(input_data[feature_cols])
-        probabilities = self.model.predict_proba(input_data[feature_cols])
 
         # Get dependent feature keys
         dependent_feature_keys = [feature.key for feature in request.model.dependent_features]
@@ -27,15 +21,31 @@ class ModelService:
         # Create prediction results
         prediction_results = []
         for i in range(len(input_data)):
+            prompt = input_data.iloc[i]['prompt']
+
+            # Encode the prompt and create attention mask
+            inputs = self.tokenizer(prompt, return_tensors="pt")
+            inputs = {key: value.to('cpu') for key, value in inputs.items()}
+
+            # Generate the output
+            tokens = self.model.generate(inputs["input_ids"], attention_mask=inputs["attention_mask"], max_new_tokens=50, )[0]
+            output = self.tokenizer.decode(
+                tokens,
+                skip_special_tokens=True
+            )
+
+            prediction = {
+                "output": output[len(prompt):]
+            }
+
             # Create dict with output features as keys
             prediction_dict = {
-                feature_key: value
-                for feature_key, value in zip(dependent_feature_keys, predictions[i].ravel().tolist())
+                feature_key: prediction[feature_key]
+                for feature_key in dependent_feature_keys
             }
 
             # Add metadata
             prediction_dict["jaqpotMetadata"] = {
-                "probabilities": probabilities[i].tolist(),
                 "jaqpotRowId": input_data['jaqpotRowId'].iloc[i]
             }
 
