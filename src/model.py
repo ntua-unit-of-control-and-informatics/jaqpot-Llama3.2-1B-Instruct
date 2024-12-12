@@ -26,10 +26,9 @@ class ModelService:
         # Convert input list to DataFrame
         input_data = pd.DataFrame(request.dataset.input)
 
-        # Get dependent feature keys
-        dependent_feature_keys = [feature.key for feature in request.model.dependent_features]
+        input_row = input_data.iloc[0]
 
-        prompt = input_data.iloc[0]['prompt']
+        prompt = input_row['prompt']
 
         return StreamingResponse(self.response_generator(prompt), media_type='text/event-stream')
 
