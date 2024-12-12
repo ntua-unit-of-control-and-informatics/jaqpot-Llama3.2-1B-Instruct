@@ -9,7 +9,10 @@ from src.loggers.logger import logger
 from src.loggers.log_middleware import LogMiddleware
 from src.model import ModelService
 
+from fastapi.responses import StreamingResponse
+
 model_service: ModelService = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -21,10 +24,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ML Model API", lifespan=lifespan)
 app.add_middleware(LogMiddleware)
 
+
 @app.post("/infer", response_model=PredictionResponse)
-def infer(req: PredictionRequest) -> PredictionResponse:
+def infer(req: PredictionRequest) -> StreamingResponse:
     try:
-        return model_service.predict(req)
+        return model_service.infer(req)
     except Exception as e:
         logger.error("Prediction request for model failed " + str(e))
         raise HTTPException(status_code=500, detail=str(e))
@@ -36,4 +40,4 @@ def health_check():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8002, log_config=None)
+    uvicorn.run(app, host="0.0.0.0", port=8005, log_config=None)
