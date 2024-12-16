@@ -30,15 +30,7 @@ class ModelService:
     # The generation process
     def start_generation(self, query: str, streamer):
 
-
-
-        prompt = """  
-
-                # You are assistant that behaves very professionally.   
-                # You will only provide the answer if you know the answer. If you do not know the answer, you will say I dont know.   
-
-                # ###Human: {instruction},  
-                # ###Assistant: """.format(instruction=query)
+        prompt = """{instruction}""".format(instruction=query)
         inputs = self.tokenizer([prompt], return_tensors="pt").to("cpu")
         generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=64, temperature=0.1)
         thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
