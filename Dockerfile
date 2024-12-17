@@ -12,4 +12,4 @@ COPY ./main.py ./model.pkl ./tokenizer.pkl /code/
 
 EXPOSE 8002
 
-CMD ["python", "-m", "main", "--port", "8002"]
+CMD ["python", "-m", "main", "--port", "8005"]
