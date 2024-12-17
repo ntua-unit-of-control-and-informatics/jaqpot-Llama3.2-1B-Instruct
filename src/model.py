@@ -4,6 +4,7 @@ from threading import Thread
 
 import joblib
 import pandas as pd
+import torch
 from jaqpot_api_client.models.prediction_request import PredictionRequest
 from jaqpot_api_client.models.prediction_response import PredictionResponse
 
@@ -31,8 +32,11 @@ class ModelService:
     def start_generation(self, query: str, streamer):
 
         prompt = """{instruction}""".format(instruction=query)
-        inputs = self.tokenizer([prompt], return_tensors="pt").to("cpu")
-        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=64, temperature=0.1)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = self.model.to(device)
+        # Update generation line:
+        inputs = self.tokenizer([prompt], return_tensors="pt").to(device)
+        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=4096, temperature=0.1)
         thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
         thread.start()
 
