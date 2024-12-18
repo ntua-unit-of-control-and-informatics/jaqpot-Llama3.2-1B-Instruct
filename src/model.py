@@ -1,9 +1,16 @@
-from typing import Any
+import asyncio
+from queue import Queue
+from threading import Thread
 
 import joblib
 import pandas as pd
+import torch
 from jaqpot_api_client.models.prediction_request import PredictionRequest
 from jaqpot_api_client.models.prediction_response import PredictionResponse
+
+from src.streamer import CustomStreamer
+
+from fastapi.responses import StreamingResponse
 
 
 class ModelService:
@@ -11,44 +18,40 @@ class ModelService:
         self.model = joblib.load('model.pkl')
         self.tokenizer = joblib.load('tokenizer.pkl')
 
-    def predict(self, request: PredictionRequest) -> PredictionResponse:
+    def infer(self, request: PredictionRequest) -> StreamingResponse:
         # Convert input list to DataFrame
         input_data = pd.DataFrame(request.dataset.input)
 
-        # Get dependent feature keys
-        dependent_feature_keys = [feature.key for feature in request.model.dependent_features]
+        input_row = input_data.iloc[0]
 
-        # Create prediction results
-        prediction_results = []
-        for i in range(len(input_data)):
-            prompt = input_data.iloc[i]['prompt']
+        prompt = input_row['prompt']
 
-            # Encode the prompt and create attention mask
-            inputs = self.tokenizer(prompt, return_tensors="pt")
-            inputs = {key: value.to('cpu') for key, value in inputs.items()}
+        return StreamingResponse(self.response_generator(prompt), media_type='text/event-stream')
 
-            # Generate the output
-            tokens = self.model.generate(inputs["input_ids"], attention_mask=inputs["attention_mask"], max_new_tokens=50, )[0]
-            output = self.tokenizer.decode(
-                tokens,
-                skip_special_tokens=True
-            )
+    # The generation process
+    def start_generation(self, query: str, streamer):
 
-            prediction = {
-                "output": output[len(prompt):]
-            }
+        prompt = """{instruction}""".format(instruction=query)
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = self.model.to(device)
+        # Update generation line:
+        inputs = self.tokenizer([prompt], return_tensors="pt").to(device)
+        generation_kwargs = dict(inputs, streamer=streamer, max_new_tokens=4096, temperature=0.1)
+        thread = Thread(target=self.model.generate, kwargs=generation_kwargs)
+        thread.start()
 
-            # Create dict with output features as keys
-            prediction_dict = {
-                feature_key: prediction[feature_key]
-                for feature_key in dependent_feature_keys
-            }
+        # Generation initiator and response server
 
-            # Add metadata
-            prediction_dict["jaqpotMetadata"] = {
-                "jaqpotRowId": input_data['jaqpotRowId'].iloc[i]
-            }
+    async def response_generator(self, query: str):
+        streamer_queue = Queue()
+        streamer = CustomStreamer(streamer_queue, self.tokenizer, True)
 
-            prediction_results.append(prediction_dict)
+        self.start_generation(query, streamer)
 
-        return PredictionResponse(predictions=prediction_results)
+        while True:
+            value = streamer_queue.get()
+            if value == None:
+                break
+            yield value
+            streamer_queue.task_done()
+            await asyncio.sleep(0.1)
