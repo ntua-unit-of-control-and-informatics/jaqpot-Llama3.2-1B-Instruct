@@ -23,6 +23,6 @@ COPY ./main.py /code/
 COPY --from=trainer /code/model.pkl /code/model.pkl
 COPY --from=trainer /code/tokenizer.pkl /code/tokenizer.pkl
 
-EXPOSE 8002
+EXPOSE 8005
 
 CMD ["python", "-m", "main", "--port", "8005"]
