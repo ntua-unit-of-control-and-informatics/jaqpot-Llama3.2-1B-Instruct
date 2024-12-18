@@ -1,14 +1,27 @@
-FROM python:3.10
+# Training stage
+FROM python:3.10 AS trainer
 
 WORKDIR /code
 
 COPY ./requirements.txt /code/requirements.txt
 COPY ./src /code/src
+COPY ./train.py /code/train.py
+COPY ./llama /code/llama
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 RUN python train.py
 
-COPY ./main.py ./model.pkl ./tokenizer.pkl /code/
+# Deployment stage
+FROM python:3.10
+
+WORKDIR /code
+
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+
+COPY ./main.py /code/
+COPY --from=trainer /code/model.pkl /code/model.pkl
+COPY --from=trainer /code/tokenizer.pkl /code/tokenizer.pkl
 
 EXPOSE 8002
 

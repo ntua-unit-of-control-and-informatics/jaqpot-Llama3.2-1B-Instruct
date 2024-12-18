@@ -5,12 +5,10 @@ from threading import Thread
 import joblib
 import pandas as pd
 import torch
+from fastapi.responses import StreamingResponse
 from jaqpot_api_client.models.prediction_request import PredictionRequest
-from jaqpot_api_client.models.prediction_response import PredictionResponse
 
 from src.streamer import CustomStreamer
-
-from fastapi.responses import StreamingResponse
 
 
 class ModelService:
@@ -22,7 +20,8 @@ class ModelService:
         # Convert input list to DataFrame
         input_data = pd.DataFrame(request.dataset.input)
 
-        input_row = input_data.iloc[0]
+        last_index = input_data.index[-1]
+        input_row = input_data.iloc[last_index]
 
         prompt = input_row['prompt']
 
@@ -31,7 +30,7 @@ class ModelService:
     # The generation process
     def start_generation(self, query: str, streamer):
 
-        prompt = """{instruction}""".format(instruction=query)
+        prompt = f"""{query}"""
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = self.model.to(device)
         # Update generation line:
@@ -50,7 +49,7 @@ class ModelService:
 
         while True:
             value = streamer_queue.get()
-            if value == None:
+            if value is None:
                 break
             yield value
             streamer_queue.task_done()
